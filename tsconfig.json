@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      // The linked @ce-net/sdk dist ships a hash-named declaration file, but its
+      // package.json `exports.types` points at a non-existent `index.d.ts`. Until the
+      // SDK build is fixed to emit a stable `index.d.ts`, map the import to the real
+      // declaration so our typecheck resolves the full typed surface. Runtime
+      // resolution (Vite) is unaffected and uses the published `default` entry.
+      "@ce-net/sdk": ["../ce-ts/dist/index-BcHSceO_.d.ts"]
+    },
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+    "noEmit": true
+  },
+  "include": ["src", "vite.config.ts"]
+}

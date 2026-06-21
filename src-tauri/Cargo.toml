@@ -1,0 +1,39 @@
+[package]
+name = "ce-host"
+version = "0.1.0"
+description = "CE Host — the qBittorrent-for-compute hosting dashboard (Tauri shell)"
+authors = ["Leif Rydenfalk <ledamecrydenfalk@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/ce-net/ce-host"
+edition = "2024"
+rust-version = "1.85"
+
+# The library target is what Tauri's mobile/desktop entrypoints bind to.
+[lib]
+name = "ce_host_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "ce-host"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "fs"] }
+which = "7"
+dirs = "6"
+
+[features]
+# This feature is used by the prevent_default! macro / production builds.
+custom-protocol = ["tauri/custom-protocol"]
