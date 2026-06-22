@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout ce-host
+        uses: actions/checkout@v4
+        with:
+          path: ce-host
+
+      # ce-host depends on @ce-net/sdk (file:../ce-ts) and @ce-net/ui
+      # (file:../ce-ui). Check both out as siblings and build them first so their
+      # dist/ + type declarations exist for ce-host's typecheck and bundle.
+      - name: Checkout ce-ts (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: ce-net/ce-ts
+          path: ce-ts
+
+      - name: Checkout ce-ui (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: ce-net/ce-ui
+          path: ce-ui
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install ce-ts
+        working-directory: ce-ts
+        run: npm install
+
+      - name: Build ce-ts
+        working-directory: ce-ts
+        run: npm run build
+
+      - name: Install ce-ui
+        working-directory: ce-ui
+        run: npm install
+
+      - name: Build ce-ui
+        working-directory: ce-ui
+        run: npm run build
+
+      - name: Install ce-host
+        working-directory: ce-host
+        run: npm install
+
+      - name: Build ce-host
+        working-directory: ce-host
+        run: npm run build

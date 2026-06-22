@@ -25,8 +25,26 @@ import {
   resumeHosting as tauriResume,
 } from "../lib/tauri.js";
 
-type HostMode = "hosting" | "draining" | "paused";
+export type HostMode = "hosting" | "draining" | "paused";
 let hostMode: HostMode = "hosting";
+
+/**
+ * The graceful-drain pause guard: pausing while jobs are in-flight must NOT jump straight to
+ * `paused` (which models "advertise nothing / safe to stop"). It enters `draining` so running
+ * jobs are left to finish and still settle; only an empty host pauses immediately. This is the
+ * single decision that prevents a one-click money-losing shutdown.
+ */
+export function drainModeFor(runningCount: number): HostMode {
+  return runningCount > 0 ? "draining" : "paused";
+}
+
+/**
+ * Cores to restore on resume: if the cap was zeroed by a pause, come back at half the system
+ * cores (min 1); otherwise keep whatever the user had set. Pure — no config/DOM access.
+ */
+export function restoreCores(currentCap: number, sysCores: number): number {
+  return currentCap === 0 ? Math.max(1, Math.floor(sysCores / 2)) : currentCap;
+}
 
 export function renderCaps(store: Store, root: HTMLElement): void {
   const cfg = loadConfig();
@@ -331,7 +349,7 @@ async function pauseHosting(store: Store, root: HTMLElement, runningCount: numbe
   });
   if (!ok) return;
 
-  hostMode = runningCount > 0 ? "draining" : "paused";
+  hostMode = drainModeFor(runningCount);
   // Persist a 0-offer cap as the boundary-clean "advertise nothing" signal.
   const cfg = loadConfig();
   saveConfig({ caps: { ...cfg.caps, cpuCores: 0 } });
@@ -381,7 +399,7 @@ async function resumeHosting(store: Store, root: HTMLElement): Promise<void> {
   const cfg = loadConfig();
   const selfAtlas = store.state.atlas.find((a) => a.nodeId === store.selfNodeId);
   const sys = selfAtlas?.cpuCores ?? 8;
-  const restore = cfg.caps.cpuCores === 0 ? Math.max(1, Math.floor(sys / 2)) : cfg.caps.cpuCores;
+  const restore = restoreCores(cfg.caps.cpuCores, sys);
   saveConfig({ caps: { ...cfg.caps, cpuCores: restore } });
 
   // Native shell: tell the supervisor to start advertising/accepting work again.
@@ -398,8 +416,7 @@ async function resumeHosting(store: Store, root: HTMLElement): Promise<void> {
 }
 
 /** True if `now` falls inside the [start, end) window (handles overnight wrap). */
-function withinWindow(sc: CapsConfig["scheduler"]): boolean {
-  const now = new Date();
+export function withinWindow(sc: CapsConfig["scheduler"], now: Date = new Date()): boolean {
   const cur = now.getHours() * 60 + now.getMinutes();
   const start = toMinutes(sc.windowStart);
   const end = toMinutes(sc.windowEnd);
