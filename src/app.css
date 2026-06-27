@@ -147,6 +147,11 @@ body {
   flex: 1;
 }
 
+.rail .install-btn {
+  margin: 4px 4px 10px;
+  width: calc(100% - 8px);
+}
+
 .rail-foot {
   padding: 10px 8px 2px;
   border-top: 1px solid var(--line);

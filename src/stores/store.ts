@@ -117,10 +117,17 @@ export class Store {
   private static readonly TX_RING = 60;
   private static readonly RATE_RING = 48;
 
-  /** Rebuild the client (e.g. after the user sets a base URL / token in web mode). */
-  reconfigure(baseUrl: string, token?: string): void {
-    saveConfig(token !== undefined ? { baseUrl, token } : { baseUrl });
-    this.client = makeClient(baseUrl, token);
+  /**
+   * Rebuild the client and restart polling/streams. `opts.fetch` injects a transport (the
+   * in-browser node bridge); `opts.persist` (default true) writes the URL/token to app config —
+   * pass false for ephemeral bindings like the bridge whose sentinel URL must not pollute the
+   * BYO default.
+   */
+  reconfigure(baseUrl: string, token?: string, opts?: { fetch?: typeof fetch; persist?: boolean }): void {
+    if (opts?.persist !== false) {
+      saveConfig(token !== undefined ? { baseUrl, token } : { baseUrl });
+    }
+    this.client = makeClient(baseUrl, token, opts?.fetch);
     this.start();
   }
 
@@ -391,10 +398,13 @@ export class Store {
   }
 }
 
-function makeClient(baseUrl: string, token?: string): CeClient {
-  return token !== undefined && token !== ""
-    ? CeClient.withToken(baseUrl, token)
-    : CeClient.withToken(baseUrl);
+function makeClient(baseUrl: string, token?: string, fetchImpl?: typeof fetch): CeClient {
+  // The bridge transport injects a fetch (in-process node); network transports use the default.
+  return new CeClient({
+    baseUrl,
+    ...(token !== undefined && token !== "" ? { token } : {}),
+    ...(fetchImpl ? { fetch: fetchImpl } : {}),
+  });
 }
 
 function errMsg(e: unknown): string {

@@ -32,7 +32,8 @@ import { renderApps } from "./panels/apps.js";
 import { renderGrants } from "./panels/grants.js";
 import { onboardingComplete, renderOnboarding } from "./panels/onboarding.js";
 import { renderWallet } from "./panels/wallet.js";
-import { isTauri, nodeStatus, readToken } from "./lib/tauri.js";
+import { bridgeAvailable } from "@ce-net/sdk";
+import { resolveHost, hostIsManaged } from "./lib/host.js";
 
 type ViewId = "jobs" | "network" | "explorer" | "apps" | "wallet" | "caps" | "grants";
 
@@ -40,6 +41,12 @@ interface NavSpec {
   id: ViewId;
   label: string;
   ico: string;
+}
+
+/** The non-standard PWA install event (absent from lib.dom). */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
 const NAV: NavSpec[] = [
@@ -64,23 +71,30 @@ class App {
   private viewEl = el("div", { class: "view" });
   private overlayEl = el("div", {});
 
+  /** Captured `beforeinstallprompt` event (PWA "Install app"), if the browser offered one. */
+  private installPrompt: BeforeInstallPromptEvent | null = null;
+
   start(): void {
     mount(this.app, this.railEl, this.mainEl, this.overlayEl);
     mount(this.mainEl, this.headerEl, this.bannerEl, this.viewEl);
 
-    // Native shell: adopt the supervised node's base URL + on-disk api.token so authed
-    // calls (kill / revoke / name claim) work without the user pasting anything. The
-    // browser cannot read the chmod-600 token; the Rust side hands it over via IPC.
-    void this.adoptNativeToken();
+    // Resolve the node transport for this shell (desktop supervisor / in-browser bridge /
+    // same-origin proxy / BYO) and point the Store at it. Panels never learn which.
+    void this.adoptHost();
 
     // First run → show the onboarding wizard over everything. Tauri drives real
-    // detect/install/start; the web build degrades to "point at a node".
-    if (!onboardingComplete()) {
+    // detect/install/start; the web build degrades to "point at a node". A browser that
+    // is itself a node (bridge) is already connected, so the wizard is skipped.
+    if (!onboardingComplete() && !bridgeAvailable()) {
       renderOnboarding(this.store, this.overlayEl, () => {
         this.overlayEl.replaceChildren();
         this.renderAll();
       });
     }
+
+    // PWA: offline app shell + installability (no-op in the desktop shell / vite dev).
+    this.registerServiceWorker();
+    this.setupInstallPrompt();
 
     // Re-render on every store change (cheap: panels diff via full re-render of their
     // own container only; volume here is modest).
@@ -100,25 +114,55 @@ class App {
   }
 
   /**
-   * In the Tauri shell, ask the supervisor for the live node snapshot + the api.token
-   * read off disk, and reconfigure the store to use them. No-op in web mode (isTauri()
-   * false) so the pure-web fallback path is untouched.
+   * Resolve the node transport for this shell and point the Store at it. The desktop and
+   * BYO paths persist their URL/token to config; the bridge binding is ephemeral (its
+   * sentinel URL must not become the saved default), so it is applied with persist:false.
    */
-  private async adoptNativeToken(): Promise<void> {
-    if (!isTauri()) return;
+  private async adoptHost(): Promise<void> {
     try {
-      const snap = await nodeStatus();
-      const token = snap.token ?? (await readToken());
-      if (token) {
-        const cfg = loadConfig();
-        saveConfig({ baseUrl: snap.baseUrl || cfg.baseUrl, token });
-        this.store.reconfigure(snap.baseUrl || cfg.baseUrl, token);
-      } else if (snap.baseUrl) {
-        this.store.reconfigure(snap.baseUrl, undefined);
+      const b = await resolveHost();
+      if (b.kind === "bridge") {
+        this.store.reconfigure(b.baseUrl, undefined, {
+          persist: false,
+          ...(b.fetch ? { fetch: b.fetch } : {}),
+        });
+      } else {
+        this.store.reconfigure(b.baseUrl, b.token, { persist: b.kind === "tauri" });
       }
+      this.renderAll();
     } catch {
-      // Supervisor not reachable yet; the wizard / banner remains the fallback.
+      // Resolution failed; the constructor's config-based client + the banner remain.
     }
+  }
+
+  /**
+   * Register the service worker that gives the PWA an offline app shell. Skipped in the
+   * desktop shell (the Tauri webview is not a PWA) and under the vite dev server (to avoid
+   * caching a hot-reloading bundle). Best-effort: a failure never blocks the app.
+   */
+  private registerServiceWorker(): void {
+    if (hostIsManaged() && !bridgeAvailable()) return; // desktop shell: not a PWA
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    if (typeof location !== "undefined" && location.port === "5180") return; // vite dev
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* SW unsupported / blocked; the app still runs online */
+    });
+  }
+
+  /**
+   * Capture the browser's install offer so we can surface an explicit "Install app" action
+   * in the rail (instead of relying on the address-bar affordance). Cleared once installed.
+   */
+  private setupInstallPrompt(): void {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      this.installPrompt = e as BeforeInstallPromptEvent;
+      this.renderRail();
+    });
+    window.addEventListener("appinstalled", () => {
+      this.installPrompt = null;
+      this.renderRail();
+    });
   }
 
   private go(id: ViewId): void {
@@ -181,14 +225,35 @@ class App {
       ),
       ...items,
       el("div", { class: "spacer" }),
+      this.installPrompt
+        ? el(
+            "button",
+            { class: "btn sm primary install-btn", onClick: () => void this.promptInstall() },
+            "Install app",
+          )
+        : null,
       el(
         "div",
         { class: "rail-foot" },
-        cfg.baseUrl,
+        bridgeAvailable() ? "in-browser node" : cfg.baseUrl,
         el("br", {}),
         this.store.state.status ? `h ${this.store.state.status.height}` : "—",
       ),
     );
+  }
+
+  /** Fire the captured PWA install prompt, then clear it (one-shot per browser). */
+  private async promptInstall(): Promise<void> {
+    const ev = this.installPrompt;
+    if (!ev) return;
+    this.installPrompt = null;
+    this.renderRail();
+    try {
+      await ev.prompt();
+      await ev.userChoice;
+    } catch {
+      /* user dismissed or unsupported */
+    }
   }
 
   private renderHeaderAndBanner(): void {
@@ -203,7 +268,8 @@ class App {
    */
   private renderBanner(): void {
     const cfg = loadConfig();
-    if (cfg.token) {
+    // Managed transports (desktop supervisor, in-browser bridge) need no pasted token.
+    if (cfg.token || hostIsManaged()) {
       this.bannerEl.replaceChildren();
       return;
     }

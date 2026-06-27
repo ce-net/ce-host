@@ -30,8 +30,26 @@ node's existing HTTP+SSE API via [`@ce-net/sdk`](../ce-ts) and renders these vie
 The same `src/` web bundle is the flagship across platforms (see
 `../PLAN/native-ui-flagship.md`): the **desktop** Tauri shell (this repo's `src-tauri/`,
 which supervises and auto-installs the node), a **browser PWA**, and a **mobile** companion
-shell. Phase 1 (here) is the desktop flagship + the new Network/Explorer/Apps views; the
-PWA and mobile shells are later phases that reuse this exact bundle.
+shell (later phase). A single seam — `src/lib/host.ts` — resolves *where the node is* per
+shell, so the panels never change:
+
+| Shell | `host.ts` kind | Node transport | Token |
+|---|---|---|---|
+| Desktop (Tauri) | `tauri` | supervised local `ce`, base URL + on-disk api.token over IPC | auto |
+| Browser PWA (in-page node) | `bridge` | `window.__ceNode` in-process via the SDK `bridgeFetch` — no network | none |
+| Browser, same-origin | `proxy` | reverse proxy `/ce` → `127.0.0.1:8844` | optional |
+| Browser, BYO | `byo` | an explicit node URL | pasted |
+
+### PWA (installable + offline shell)
+
+The web build ships a `manifest.webmanifest` and a service worker (`public/sw.js`):
+the worker precaches the app shell and serves it offline (navigations are network-first
+with a cached-shell fallback; hashed assets are stale-while-revalidate). The **live node
+API (`/ce/*`) and the in-browser bridge are never cached** — node data is always live. The
+SW is registered from `main.ts` only in the PWA (skipped in the Tauri shell and under the
+vite dev server); a captured `beforeinstallprompt` surfaces an explicit **Install app**
+button in the rail. Serve the built `dist/` via `ce-serve` (which can also inject the
+`/mesh-bridge` so the page becomes a node); a live browser smoke test must gate any deploy.
 
 ## Run (pure web)
 
