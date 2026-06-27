@@ -2,7 +2,7 @@
   "name": "ce-host",
   "version": "0.1.0",
   "private": true,
-  "description": "CE Host — the qBittorrent-for-compute hosting dashboard. A pure SDK client for the local CE node.",
+  "description": "CE Desktop — the flagship native UI for ce-net: join the mesh, visualize the network, run apps, manage your node. A pure SDK client for the local CE node.",
   "type": "module",
   "license": "MIT",
   "author": "Leif Rydenfalk <ledamecrydenfalk@gmail.com>",

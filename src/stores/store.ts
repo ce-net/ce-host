@@ -63,6 +63,10 @@ export interface StoreState {
   historyAvailable: boolean;
   /** Open payment channels (GET /channels). */
   channels: Channel[];
+  /** Newest-first ring of recently observed blocks (from /blocks/stream), for the Explorer. */
+  recentBlocks: BlockEvent[];
+  /** Newest-first ring of recently observed transactions of every kind (from /transactions/stream). */
+  recentTx: TxEvent[];
   error: string | null;
 }
 
@@ -99,9 +103,15 @@ export class Store {
       txHistory: [],
       historyAvailable: true,
       channels: [],
+      recentBlocks: [],
+      recentTx: [],
       error: null,
     };
   }
+
+  /** Cap for the Explorer's live rings — bounded so memory stays flat over long sessions. */
+  private static readonly BLOCK_RING = 40;
+  private static readonly TX_RING = 60;
 
   /** Rebuild the client (e.g. after the user sets a base URL / token in web mode). */
   reconfigure(baseUrl: string, token?: string): void {
@@ -271,7 +281,11 @@ export class Store {
           signal: this.abort.signal,
           reconnect: true,
         })) {
-          this.set({ lastBlock: blk });
+          // Prepend into the Explorer ring (dedupe by block hash; keep newest first).
+          const recentBlocks = this.state.recentBlocks.some((b) => b.hash === blk.hash)
+            ? this.state.recentBlocks
+            : [blk, ...this.state.recentBlocks].slice(0, Store.BLOCK_RING);
+          this.set({ lastBlock: blk, recentBlocks });
           // A new block lands → re-pull authoritative status + self history.
           void this.refreshStatus();
         }
@@ -298,6 +312,11 @@ export class Store {
 
   /** Feed a tx into the per-origin accrual ring (heartbeats + settlements). */
   private recordTx(tx: TxEvent): void {
+    // Explorer live feed: every kind, newest first, deduped by tx id, ring-bounded.
+    if (!this.state.recentTx.some((r) => r.id === tx.id)) {
+      this.set({ recentTx: [tx, ...this.state.recentTx].slice(0, Store.TX_RING) });
+    }
+
     // Live-tail any tx that touches self into the wallet history (prepend, newest first).
     // The stream frame only carries { id, origin, kind, amount }; we derive direction the way
     // ce.wallet.streamTransactions would (origin === self → out, else in) and mark height 0

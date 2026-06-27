@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CE Host",
+  "productName": "CE Desktop",
   "version": "0.1.0",
   "identifier": "com.ce-net.host",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "CE Host — hosting dashboard",
+        "title": "CE Desktop — your node on the mesh",
         "width": 1180,
         "height": 760,
         "minWidth": 900,
@@ -32,7 +32,7 @@
       "icons/icon.png"
     ],
     "category": "Utility",
-    "shortDescription": "Host your machine on the CE compute mesh.",
-    "longDescription": "CE Host is the qBittorrent-for-compute hosting dashboard: run a CE node, watch what you earn, set resource caps, and walk away — the app supervises the node and keeps earning in the tray."
+    "shortDescription": "Join the CE compute mesh: one node, made legible.",
+    "longDescription": "CE Desktop is the flagship native app for ce-net. Join the mesh in one click (it installs and supervises the CE node for you), watch the network live, run apps from the ce-appmgr store, manage capabilities, and see what you earn — the app keeps your node earning in the tray."
   }
 }

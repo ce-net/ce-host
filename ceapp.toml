@@ -1,0 +1,46 @@
+# CE Desktop — the flagship native UI for ce-net, installed + run through the one `ce` binary.
+#
+#   Dev (from this tree):   ce app install ./ce-host        # uses the freshly-built bundle
+#   Run:                    ce app run ce-desktop           # or the `ce-desktop` shim on PATH
+#
+# CE Desktop is a Tauri shell around the pure-web bundle in src/. The Rust side (src-tauri)
+# supervises a local `ce` node (install, start, graceful drain, api.token read) and exposes
+# the ce-appmgr store, so installing CE Desktop is the one-click on-ramp to the whole mesh.
+#
+# It closes the loop: `ce` (which contains ce-appmgr) installs CE Desktop, and CE Desktop
+# installs + supervises `ce`. The browser/PWA + mobile shells ship the same src/ bundle.
+
+[app]
+name      = "ce-desktop"
+version   = "0.1.0"
+summary   = "Flagship native UI for ce-net: join the mesh, visualize the network, run apps, manage your node"
+runtime   = "native"
+# Signing publisher (the manifest is Ed25519-signed by this CE node key; install verifies it).
+publisher = "c0be11e0ce0aaa769da6f9970244947d3d32a0c0d8302fb5f41f73d7950be456"
+
+[native]
+bin = "ce-desktop"
+# Content-addressed; ce picks the host's (os, arch). These are sha256 of the release bundle's
+# launch binary, uploaded to ce-hub /blobs for a registry install. They are filled at release
+# time (see packaging) — a local-source `ce app install ./ce-host` ignores them and uses the
+# freshly-built Tauri bundle directly. The Tauri build is `npm run tauri build` in src-tauri.
+[native.artifacts]
+# "darwin-arm64" = "FILLED_AT_RELEASE"
+# "darwin-amd64" = "FILLED_AT_RELEASE"
+# "linux-amd64"  = "FILLED_AT_RELEASE"
+# "windows-amd64" = "FILLED_AT_RELEASE"
+
+[deps]
+# CE Desktop supervises the node itself (it installs `ce` if absent), so it declares no
+# install-time app deps. At runtime it talks to the local node's HTTP+SSE API on :8844.
+
+[sandbox]
+# A native desktop GUI (Tauri WebView) is not a Linux container, and it intentionally
+# manages host processes (spawns `ce start`, runs `ce app …`). gVisor/runc do not apply;
+# this is the trusted local supervisor, run by the machine's owner. Honest and explicit.
+tier       = "none"
+net        = "loopback:8844"  # local node API; plus HTTPS to fetch installers / the registry
+capability = "inherit"
+
+# No [daemon]: this is a user-launched GUI app. It keeps the node earning in the tray while
+# open; the node's own service (`ce install-service`) is what runs it headless.

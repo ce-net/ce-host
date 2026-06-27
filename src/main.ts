@@ -1,10 +1,11 @@
 /**
- * CE Host — app shell.
+ * CE Desktop — app shell (repo: ce-host).
  *
- * Pure-web SPA (Vite + TypeScript) that imports @ce-net/sdk and talks to a local CE
- * node's HTTP+SSE API. No framework: a single reactive Store fans out to panels that
- * each render into their own container. The shell owns navigation, the always-visible
- * overview header, and the web BYO-token banner.
+ * The flagship native UI for ce-net: one machine's node, made legible. Pure-web SPA
+ * (Vite + TypeScript) that imports @ce-net/sdk and talks to a local CE node's HTTP+SSE
+ * API. No framework: a single reactive Store fans out to panels (Jobs, Network, Explorer,
+ * Apps, Wallet, Caps, Capabilities) that each render into their own container. The shell
+ * owns navigation, the always-visible overview header, and the web BYO-token banner.
  *
  * TAURI UPGRADE PATH (see docs/design.md): wrap this exact bundle in a Tauri window.
  * The Rust `src-tauri` side then (1) supervises `ce start` (one-click onboarding, tray
@@ -25,13 +26,15 @@ import { loadConfig, saveConfig } from "./lib/config.js";
 import { renderHeader } from "./panels/header.js";
 import { renderJobs } from "./panels/jobs.js";
 import { renderCaps } from "./panels/caps.js";
-import { renderAtlas } from "./panels/atlas.js";
+import { renderNetwork } from "./panels/network.js";
+import { renderExplorer } from "./panels/explorer.js";
+import { renderApps } from "./panels/apps.js";
 import { renderGrants } from "./panels/grants.js";
 import { onboardingComplete, renderOnboarding } from "./panels/onboarding.js";
 import { renderWallet } from "./panels/wallet.js";
 import { isTauri, nodeStatus, readToken } from "./lib/tauri.js";
 
-type ViewId = "jobs" | "wallet" | "caps" | "atlas" | "grants";
+type ViewId = "jobs" | "network" | "explorer" | "apps" | "wallet" | "caps" | "grants";
 
 interface NavSpec {
   id: ViewId;
@@ -41,9 +44,11 @@ interface NavSpec {
 
 const NAV: NavSpec[] = [
   { id: "jobs", label: "Jobs", ico: "▤" },
+  { id: "network", label: "Network", ico: "◈" },
+  { id: "explorer", label: "Explorer", ico: "▦" },
+  { id: "apps", label: "Apps", ico: "⬢" },
   { id: "wallet", label: "Wallet", ico: "◇" },
   { id: "caps", label: "Resource caps", ico: "▣" },
-  { id: "atlas", label: "Mesh atlas", ico: "◈" },
   { id: "grants", label: "Capabilities", ico: "⬡" },
 ];
 
@@ -136,7 +141,11 @@ class App {
   private renderLive(): void {
     renderHeader(this.store, this.headerEl);
     this.renderRail();
-    if (this.view === "jobs" || this.view === "atlas") this.renderView();
+    // Pure-data views refresh freely on the live tick. Form/async-owning views
+    // (caps, grants, apps, wallet) are left alone so input is never clobbered.
+    if (this.view === "jobs" || this.view === "network" || this.view === "explorer") {
+      this.renderView();
+    }
   }
 
   private renderRail(): void {
@@ -166,8 +175,8 @@ class App {
         el(
           "div",
           { class: "name" },
-          "CE Host",
-          el("small", {}, "compute hosting"),
+          "CE Desktop",
+          el("small", {}, "your node on the mesh"),
         ),
       ),
       ...items,
@@ -242,14 +251,20 @@ class App {
       case "jobs":
         renderJobs(this.store, this.viewEl);
         break;
+      case "network":
+        renderNetwork(this.store, this.viewEl);
+        break;
+      case "explorer":
+        renderExplorer(this.store, this.viewEl);
+        break;
+      case "apps":
+        renderApps(this.store, this.viewEl);
+        break;
       case "wallet":
         renderWallet(this.store, this.viewEl);
         break;
       case "caps":
         renderCaps(this.store, this.viewEl);
-        break;
-      case "atlas":
-        renderAtlas(this.store, this.viewEl);
         break;
       case "grants":
         renderGrants(this.store, this.viewEl);

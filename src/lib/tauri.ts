@@ -155,3 +155,62 @@ export async function installCe(): Promise<CeInstall> {
   if (!invoke) return { installed: false };
   return invoke<CeInstall>("install_ce");
 }
+
+// ---- ce-appmgr (the `ce app` substrate) ----
+//
+// `ce app` is compiled into the `ce` binary, so a working `ce` install already carries
+// the app manager. These commands let the Apps view list/install/run ceapps through the
+// supervisor, which shells out to `ce app …`. The node stays primitives-only; this is app
+// lifecycle policy living in the shell. Web mode degrades to "desktop app required".
+
+/** Readiness of the `ce app` substrate (i.e. `ce app list` runs cleanly). */
+export interface AppmgrStatus {
+  ready: boolean;
+  note?: string;
+}
+
+/** Result of a `ce app install` run: success flag + combined stdout/stderr tail. */
+export interface AppCmdResult {
+  ok: boolean;
+  output: string;
+}
+
+/** Probe whether the app manager is usable (the `ce` binary is present and `ce app` works). */
+export async function appmgrStatus(): Promise<AppmgrStatus> {
+  const invoke = await getInvoke();
+  if (!invoke) return { ready: false, note: "Web build — install the CE Desktop app to manage apps." };
+  try {
+    return await invoke<AppmgrStatus>("appmgr_status");
+  } catch (e) {
+    return { ready: false, note: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Raw `ce app list` stdout (locally installed apps). Empty string in web mode. */
+export async function ceAppListRaw(): Promise<string> {
+  const invoke = await getInvoke();
+  if (!invoke) return "";
+  try {
+    return await invoke<string>("app_list_raw");
+  } catch {
+    return "";
+  }
+}
+
+/** Raw `ce app ps` stdout (running instances across the mesh). Empty string in web mode. */
+export async function ceAppPsRaw(): Promise<string> {
+  const invoke = await getInvoke();
+  if (!invoke) return "";
+  try {
+    return await invoke<string>("app_ps_raw");
+  } catch {
+    return "";
+  }
+}
+
+/** Install a ceapp by name via `ce app install <name>`. Web mode reports unavailable. */
+export async function ceAppInstall(name: string): Promise<AppCmdResult> {
+  const invoke = await getInvoke();
+  if (!invoke) return { ok: false, output: "Desktop app required to install apps." };
+  return invoke<AppCmdResult>("app_install", { name });
+}

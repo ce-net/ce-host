@@ -907,3 +907,177 @@ a.link:hover {
   border-color: var(--teal-dim);
   color: var(--text);
 }
+
+/* ---------- network: topology map ---------- */
+
+.topo-wrap {
+  padding: 8px 10px 14px;
+}
+svg.topo {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+svg.topo .node {
+  cursor: default;
+}
+svg.topo .node circle {
+  transition: fill-opacity 0.12s;
+}
+svg.topo .node:hover circle {
+  fill-opacity: 1;
+}
+.topo-label {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.topo-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.topo-legend .leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.topo-legend .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ---------- explorer: feeds + leaderboard ---------- */
+
+.explorer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.explorer-grid + .card {
+  margin-top: 16px;
+}
+@media (max-width: 860px) {
+  .explorer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.muted-note {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.feed {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.feed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.feed-row:last-child {
+  border-bottom: none;
+}
+.feed-row:hover {
+  background: var(--panel-2);
+}
+.feed .mono {
+  font-family: var(--mono);
+}
+.feed-lead {
+  font-family: var(--mono);
+  color: var(--text);
+  min-width: 58px;
+}
+.feed-mid {
+  color: var(--muted);
+}
+.feed-tag {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.feed-by {
+  color: var(--faint);
+  font-size: 11px;
+  margin-left: auto;
+}
+.feed-age {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  min-width: 38px;
+  text-align: right;
+}
+.tx-kind {
+  font-family: var(--mono);
+  font-size: 11px;
+  min-width: 130px;
+}
+.feed-amt {
+  margin-left: auto;
+  color: var(--text);
+}
+
+/* ---------- apps: store grid + raw output ---------- */
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+}
+.app-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.app-card:hover {
+  border-color: var(--line-2);
+}
+.app-name {
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.app-name .app-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  font-weight: 400;
+}
+.app-desc {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+  flex: 1;
+}
+.app-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.app-out {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}

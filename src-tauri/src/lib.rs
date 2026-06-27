@@ -1,4 +1,4 @@
-//! CE Host — Tauri shell library.
+//! CE Desktop — Tauri shell library (repo: ce-host).
 //!
 //! Hosts the exact pure-web bundle in a native window and exposes the node supervisor
 //! over IPC commands the front-end calls through `src/lib/tauri.ts`. A system tray gives
@@ -7,7 +7,7 @@
 
 mod supervisor;
 
-use supervisor::{CeInstall, NodeSnapshot, Supervisor};
+use supervisor::{AppCmdResult, AppmgrStatus, CeInstall, NodeSnapshot, Supervisor};
 use tauri::{
     Manager,
     menu::{Menu, MenuItem},
@@ -57,6 +57,29 @@ async fn resume_hosting(sup: tauri::State<'_, Supervisor>) -> Result<NodeSnapsho
     sup.resume().await.map_err(err_to_string)
 }
 
+#[tauri::command]
+async fn appmgr_status(sup: tauri::State<'_, Supervisor>) -> Result<AppmgrStatus, String> {
+    Ok(sup.appmgr_status().await)
+}
+
+#[tauri::command]
+async fn app_list_raw(sup: tauri::State<'_, Supervisor>) -> Result<String, String> {
+    sup.app_list_raw().await.map_err(err_to_string)
+}
+
+#[tauri::command]
+async fn app_ps_raw(sup: tauri::State<'_, Supervisor>) -> Result<String, String> {
+    sup.app_ps_raw().await.map_err(err_to_string)
+}
+
+#[tauri::command]
+async fn app_install(
+    sup: tauri::State<'_, Supervisor>,
+    name: String,
+) -> Result<AppCmdResult, String> {
+    sup.app_install(&name).await.map_err(err_to_string)
+}
+
 /// Build and run the Tauri application.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -91,14 +114,18 @@ pub fn run() {
             read_token,
             pause_hosting,
             resume_hosting,
+            appmgr_status,
+            app_list_raw,
+            app_ps_raw,
+            app_install,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running CE Host");
+        .expect("error while running CE Desktop");
 }
 
 /// System tray: show window, pause/resume hosting, quit.
 fn build_tray(app: tauri::AppHandle) -> tauri::Result<()> {
-    let show = MenuItem::with_id(&app, "show", "Show CE Host", true, None::<&str>)?;
+    let show = MenuItem::with_id(&app, "show", "Show CE Desktop", true, None::<&str>)?;
     let pause = MenuItem::with_id(&app, "pause", "Pause hosting (drain)", true, None::<&str>)?;
     let resume = MenuItem::with_id(&app, "resume", "Resume hosting", true, None::<&str>)?;
     let quit = MenuItem::with_id(&app, "quit", "Quit", true, None::<&str>)?;
@@ -109,7 +136,7 @@ fn build_tray(app: tauri::AppHandle) -> tauri::Result<()> {
     // surface the bundle icon for the window regardless.
     TrayIconBuilder::with_id("ce-host-tray")
         .icon(default_icon())
-        .tooltip("CE Host — hosting compute")
+        .tooltip("CE Desktop — your node on the mesh")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {

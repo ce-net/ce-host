@@ -117,11 +117,11 @@ function draw(
     el(
       "div",
       {},
-      el("h1", {}, "Welcome to CE Host"),
+      el("h1", {}, "Welcome to CE Desktop"),
       el(
         "p",
         { class: "onboard-sub" },
-        "Host your machine on the CE mesh in four steps. ",
+        "Join your machine to the CE mesh in four steps. ",
         "Host more than you spend and your ratio climbs — like seeding.",
       ),
     ),

@@ -2,6 +2,15 @@
 
 > Workstream: `hosting-ui` · Suggested target path: `ce-host/docs/design.md`
 > Depends on: none
+>
+> **Status note (Phase 1, flagship):** this repo is now **CE Desktop**, the flagship
+> native UI for ce-net (see `../../PLAN/native-ui-flagship.md`). The original hosting
+> dashboard below is the Jobs/Caps/Wallet/Capabilities core; it has grown three new
+> views — **Network** (radial topology + atlas), **Explorer** (live blocks/txs +
+> capacity leaderboard), and **Apps** (the ce-appmgr store) — and the same `src/` bundle
+> is destined for three shells (desktop Tauri, browser PWA, mobile companion). The
+> implementation is **framework-free vanilla TS** (not Svelte as this older doc proposed);
+> the README is the living reference for the current view set.
 
 **Summary:** CE Host is a Tauri desktop app (with a pure-web fallback) that turns "run a CE node and host jobs" into a one-window, torrent-client experience: global earnings/ratio/uptime header, a live running-jobs table with per-row kill, resource caps + scheduler, a peers/atlas view, and a capability-grants manager. It is a pure SDK client — zero new node primitives — talking to the local node's existing HTTP API (`/status`, `/jobs`, `/atlas`, `/history`, `/transactions/stream`, `/blocks/stream`, `DELETE /jobs/:id`, `/capabilities/*`). The one real gap (the `/jobs` rows carry no live cpu/mem/elapsed/credits-per-minute) is closed app-side by joining job rows against the `Heartbeat`/`JobSettle` transaction stream and the original bid spec, with two optional thin read-only node endpoints proposed for a cleaner v2. We ship a new TypeScript SDK `@ce-net/sdk` (mirroring the Rust `ce-rs` surface) plus a shared `@ce-net/ui` panel library, reusing the existing `web/` theme and animated-counter/SSE patterns. Non-technical onboarding is a 4-step wizard (install node, start, name yourself, set caps) that hides node lifecycle behind the app.
 

@@ -79,6 +79,21 @@ pub struct NodeSnapshot {
     pub note: Option<String>,
 }
 
+/// Readiness of the `ce app` substrate, mirrored by the TS `AppmgrStatus`.
+#[derive(Debug, Clone, Serialize)]
+pub struct AppmgrStatus {
+    pub ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// Result of an app manager command, mirrored by the TS `AppCmdResult`.
+#[derive(Debug, Clone, Serialize)]
+pub struct AppCmdResult {
+    pub ok: bool,
+    pub output: String,
+}
+
 /// Shared, cloneable handle to the supervisor.
 #[derive(Clone)]
 pub struct Supervisor {
@@ -275,6 +290,70 @@ impl Supervisor {
         read_api_token()
     }
 
+    // ---- ce-appmgr (`ce app`) ----
+    //
+    // The app manager is part of the `ce` binary, so a present `ce` already carries it.
+    // These shell out to `ce app …` and hand the result to the Apps view. We never build
+    // a shell string from UI input — args are passed verbatim to `Command`, and the app
+    // name is validated before use, so there is no command-injection surface.
+
+    /// Probe the app substrate: run `ce app list` and report whether it succeeds.
+    pub async fn appmgr_status(&self) -> AppmgrStatus {
+        match locate_ce() {
+            None => AppmgrStatus { ready: false, note: Some("`ce` binary not found.".into()) },
+            Some(path) => match Command::new(&path).args(["app", "list"]).output().await {
+                Ok(out) if out.status.success() => AppmgrStatus { ready: true, note: None },
+                Ok(out) => AppmgrStatus {
+                    ready: false,
+                    note: Some(tail(&String::from_utf8_lossy(&out.stderr), 240)),
+                },
+                Err(e) => AppmgrStatus { ready: false, note: Some(format!("{e}")) },
+            },
+        }
+    }
+
+    /// Raw stdout of `ce app list` (locally installed apps).
+    pub async fn app_list_raw(&self) -> Result<String> {
+        self.run_ce(&["app", "list"]).await.map(|(_, out)| out)
+    }
+
+    /// Raw stdout of `ce app ps` (running instances across the mesh).
+    pub async fn app_ps_raw(&self) -> Result<String> {
+        self.run_ce(&["app", "ps"]).await.map(|(_, out)| out)
+    }
+
+    /// Install a ceapp by name via `ce app install <name>`. Validates the name first.
+    pub async fn app_install(&self, name: &str) -> Result<AppCmdResult> {
+        if !is_valid_app_name(name) {
+            return Ok(AppCmdResult {
+                ok: false,
+                output: format!("Refusing to install: {name:?} is not a valid app name."),
+            });
+        }
+        let (ok, output) = self.run_ce(&["app", "install", name]).await?;
+        Ok(AppCmdResult { ok, output })
+    }
+
+    /// Run `ce <args>` capturing combined stdout+stderr. Returns (success, text).
+    async fn run_ce(&self, args: &[&str]) -> Result<(bool, String)> {
+        let path = locate_ce().context("`ce` binary not found on PATH or ~/.local/bin")?;
+        let out = Command::new(&path)
+            .args(args)
+            .stdin(Stdio::null())
+            .output()
+            .await
+            .with_context(|| format!("failed to run `ce {}`", args.join(" ")))?;
+        let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
+        let err = String::from_utf8_lossy(&out.stderr);
+        if !err.trim().is_empty() {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(err.trim_end());
+        }
+        Ok((out.status.success(), text.trim().to_string()))
+    }
+
     // ---- internals ----
 
     async fn set_state(&self, state: NodeRunState) {
@@ -352,6 +431,26 @@ fn read_api_token() -> Option<String> {
     if t.is_empty() { None } else { Some(t) }
 }
 
+/// Keep only the last `max` chars of `s` (for bounded error notes in the UI).
+fn tail(s: &str, max: usize) -> String {
+    let s = s.trim();
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let start = s.chars().count() - max;
+    s.chars().skip(start).collect()
+}
+
+/// A ceapp name is a lowercase id: letters, digits, dot, underscore, hyphen. This is the
+/// allowlist the install path validates UI input against before passing it to `ce app`.
+fn is_valid_app_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-'))
+}
+
 /// Pick a platform installer command for `ce`. Returns `(program, args)`.
 fn installer_command() -> Option<(&'static str, Vec<&'static str>)> {
     // Prefer Homebrew (macOS/Linux), then Scoop (Windows). We avoid blindly piping a
@@ -398,6 +497,33 @@ mod tests {
         assert_eq!(j["installed"], false);
         assert!(j.get("path").is_none());
         assert!(j.get("version").is_none());
+    }
+
+    #[test]
+    fn app_name_validation_rejects_injection() {
+        assert!(is_valid_app_name("clip"));
+        assert!(is_valid_app_name("ce-cast-desktop"));
+        assert!(is_valid_app_name("ce_drive.web"));
+        assert!(!is_valid_app_name(""));
+        assert!(!is_valid_app_name("rm -rf /"));
+        assert!(!is_valid_app_name("clip; reboot"));
+        assert!(!is_valid_app_name("Clip")); // uppercase not allowed
+        assert!(!is_valid_app_name("../etc/passwd"));
+        assert!(!is_valid_app_name(&"a".repeat(65)));
+    }
+
+    #[test]
+    fn tail_bounds_length() {
+        assert_eq!(tail("short", 240), "short");
+        assert_eq!(tail(&"x".repeat(300), 10).len(), 10);
+    }
+
+    #[test]
+    fn appmgr_status_omits_none_note() {
+        let s = AppmgrStatus { ready: true, note: None };
+        let j = serde_json::to_value(&s).unwrap();
+        assert_eq!(j["ready"], true);
+        assert!(j.get("note").is_none());
     }
 
     #[test]

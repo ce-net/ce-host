@@ -1,20 +1,34 @@
-# CE Host
+# CE Desktop
 
-The qBittorrent-for-compute hosting dashboard. Open it, see what's running, see what
-you earn, set caps, walk away.
+The flagship native UI for ce-net (repo: `ce-host`). One machine's node, made legible:
+join the mesh in one click, watch the network live, run apps, and see what you earn.
 
-CE Host is a **pure SDK client** — zero new node primitives. It talks to a local CE
-node's existing HTTP+SSE API via [`@ce-net/sdk`](../ce-ts) and renders:
+CE Desktop is a **pure SDK client** — zero new node primitives. It talks to a local CE
+node's existing HTTP+SSE API via [`@ce-net/sdk`](../ce-ts) and renders these views:
 
 - **Overview header** — earnings, share ratio badge, bond/weight, uptime, jobs running,
   up-compute, live credits/min (`/status` + `/history/:self` + `/transactions/stream`).
-- **Running jobs** — a live, torrent-style table with per-row image, payer, cpu/mem,
-  elapsed, status, credits/min and a **kill** button (`/jobs`, `DELETE /jobs/:id`).
+- **Jobs** — a live, torrent-style table with per-row image, payer, cpu/mem, elapsed,
+  status, credits/min and a **kill** button (`/jobs`, `DELETE /jobs/:id`).
+- **Network** — a radial topology map of the mesh as seen from this node (self centred,
+  peers sized by cores, coloured by role) plus the dense atlas table (`/atlas`).
+- **Explorer** — live blocks + a transaction feed of every kind + a capacity leaderboard,
+  all from the SSE streams the store already consumes.
+- **Apps** — the ce-appmgr store: install a curated set of ceapps in one click and read
+  what is installed (`ce app list`) and running (`ce app ps`), driven via the supervisor.
+- **Wallet** — balance breakdown, transfers, and credit transaction history.
 - **Resource caps + scheduler** — CPU/mem offered, max jobs, advisory throttle, and a
   window/battery/CPU scheduler.
-- **Mesh atlas** — peers, capacity and tags with self highlighted (`/atlas`).
 - **Capabilities** — a local issued-grant log with copy/revoke, plus the on-chain
   revoked set (`/capabilities/revoked`, `POST /capabilities/revoke`).
+
+## One UI, three shells
+
+The same `src/` web bundle is the flagship across platforms (see
+`../PLAN/native-ui-flagship.md`): the **desktop** Tauri shell (this repo's `src-tauri/`,
+which supervises and auto-installs the node), a **browser PWA**, and a **mobile** companion
+shell. Phase 1 (here) is the desktop flagship + the new Network/Explorer/Apps views; the
+PWA and mobile shells are later phases that reuse this exact bundle.
 
 ## Run (pure web)
 
@@ -88,6 +102,17 @@ cargo tauri dev        # runs `npm run dev` (:5180) inside the native window
 ```
 
 `main.ts` is deliberately framework-free to make the wrap trivial. See `docs/design.md`.
+
+### Apps view → ce-appmgr
+
+`ce app` is the one app substrate (it ships inside the `ce` binary, so a working `ce`
+already carries it). The Apps view drives it through the supervisor: `appmgr_status`
+(probe), `app_list_raw` (`ce app list`), `app_ps_raw` (`ce app ps`), and `app_install`
+(`ce app install <name>`, with the app name validated against `[a-z0-9._-]` before it is
+passed to the process — no shell string is ever built from UI input). The CLI prints
+human text, so installed/running are shown verbatim in a monospace panel; structured cards
+follow when the node grows a JSON app surface. `ceapp.toml` declares CE Desktop itself, so
+`ce app install ce-desktop` closes the loop.
 
 ### Onboarding (4 steps)
 
