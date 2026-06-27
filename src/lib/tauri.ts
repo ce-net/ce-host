@@ -83,6 +83,24 @@ const ABSENT: NodeSnapshot = {
   note: "Tauri shell unavailable (web mode).",
 };
 
+/** Which native shell this is: desktop supervises a node; mobile runs as a companion. */
+export type ShellPlatform = "desktop" | "ios" | "android" | "web";
+
+/**
+ * Resolve the shell platform. `web` when not in Tauri at all. On mobile (ios/android) the
+ * sandbox cannot install or spawn `ce`, so the host seam runs in companion mode instead of
+ * supervising a local node.
+ */
+export async function shellPlatform(): Promise<ShellPlatform> {
+  const invoke = await getInvoke();
+  if (!invoke) return "web";
+  try {
+    return await invoke<ShellPlatform>("platform");
+  } catch {
+    return "web";
+  }
+}
+
 /** Probe for an installed `ce` binary. Web mode reports "not installed, unknown". */
 export async function detectCe(): Promise<CeInstall> {
   const invoke = await getInvoke();

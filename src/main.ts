@@ -34,6 +34,7 @@ import { onboardingComplete, renderOnboarding } from "./panels/onboarding.js";
 import { renderWallet } from "./panels/wallet.js";
 import { bridgeAvailable } from "@ce-net/sdk";
 import { resolveHost, hostIsManaged } from "./lib/host.js";
+import { parsePairing } from "./lib/pairing.js";
 
 type ViewId = "jobs" | "network" | "explorer" | "apps" | "wallet" | "caps" | "grants";
 
@@ -73,6 +74,14 @@ class App {
 
   /** Captured `beforeinstallprompt` event (PWA "Install app"), if the browser offered one. */
   private installPrompt: BeforeInstallPromptEvent | null = null;
+
+  /**
+   * Whether the resolved transport needs no pasted token (desktop supervisor / in-browser
+   * bridge). False for the companion (mobile / browser BYO) path, which shows the connect +
+   * pairing banner. Set by {@link adoptHost}; this is the accurate signal (the sync
+   * `hostIsManaged` cannot tell desktop Tauri from mobile Tauri).
+   */
+  private hostManaged = false;
 
   start(): void {
     mount(this.app, this.railEl, this.mainEl, this.overlayEl);
@@ -121,6 +130,7 @@ class App {
   private async adoptHost(): Promise<void> {
     try {
       const b = await resolveHost();
+      this.hostManaged = b.kind === "tauri" || b.kind === "bridge";
       if (b.kind === "bridge") {
         this.store.reconfigure(b.baseUrl, undefined, {
           persist: false,
@@ -269,7 +279,8 @@ class App {
   private renderBanner(): void {
     const cfg = loadConfig();
     // Managed transports (desktop supervisor, in-browser bridge) need no pasted token.
-    if (cfg.token || hostIsManaged()) {
+    // The companion path (mobile / browser BYO) keeps the connect + pairing banner.
+    if (cfg.token || this.hostManaged) {
       this.bannerEl.replaceChildren();
       return;
     }
@@ -284,13 +295,28 @@ class App {
       value: cfg.baseUrl,
       style: "max-width:180px;flex:none",
     });
+    // Companion pairing: paste a `ce-pair:` link (or a URL) to fill both fields at once —
+    // how a phone connects to the node on your laptop/desktop/relay (ce-fleet token model).
+    const pairInput = el("input", {
+      type: "text",
+      placeholder: "paste pairing link (ce-pair:…)",
+      style: "flex:1;min-width:160px",
+      onInput: (e: Event) => {
+        const p = parsePairing((e.target as HTMLInputElement).value);
+        if (p) {
+          urlInput.value = p.baseUrl;
+          tokenInput.value = p.token ?? "";
+        }
+      },
+    });
     const banner = el(
       "div",
       { class: "view", style: "padding-bottom:0" },
       el(
         "div",
         { class: "token-banner" },
-        el("span", {}, "Read-only mode."),
+        el("span", {}, "Connect to your node."),
+        pairInput,
         urlInput,
         tokenInput,
         el(

@@ -21,7 +21,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2" }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -33,6 +33,14 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "fs"] }
 which = "7"
 dirs = "6"
+
+# The system tray is a desktop-only surface; on iOS/Android there is no tray, so the
+# feature (and our build_tray code, gated #[cfg(desktop)]) is desktop-only. This keeps the
+# mobile shell — the companion build — compiling cleanly. NOTE: Cargo target tables only
+# understand rustc cfgs, not Tauri's `desktop`/`mobile`, so we spell "desktop" as the real
+# target predicate (which is exactly how Tauri derives its own `desktop` cfg).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
 
 [features]
 # This feature is used by the prevent_default! macro / production builds.

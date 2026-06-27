@@ -8,11 +8,13 @@
 mod supervisor;
 
 use supervisor::{AppCmdResult, AppmgrStatus, CeInstall, NodeSnapshot, Supervisor};
+#[cfg(desktop)]
 use tauri::{
     Manager,
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
 };
+#[cfg(desktop)]
 use tracing::warn;
 
 /// IPC command errors are surfaced to the front-end as plain strings.
@@ -80,6 +82,20 @@ async fn app_install(
     sup.app_install(&name).await.map_err(err_to_string)
 }
 
+/// Which shell this is running in. The front-end's host seam uses this to decide whether to
+/// supervise a local node (desktop) or run as a companion against a paired/remote node
+/// (ios/android), since mobile sandboxes cannot install or spawn the `ce` binary.
+#[tauri::command]
+fn platform() -> &'static str {
+    if cfg!(target_os = "ios") {
+        "ios"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else {
+        "desktop"
+    }
+}
+
 /// Build and run the Tauri application.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -91,21 +107,27 @@ pub fn run() {
         )
         .try_init();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(Supervisor::new())
+        .manage(Supervisor::new());
+
+    // Desktop-only lifecycle: a system tray (show / pause / resume / quit) and closing the
+    // window hides it to the tray so the node keeps earning in the background. Mobile has no
+    // tray and a different lifecycle, so the companion build skips both.
+    #[cfg(desktop)]
+    let builder = builder
         .setup(|app| {
             build_tray(app.handle().clone())?;
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Keep earning in the background: closing the window hides it to the tray
-            // rather than quitting (the node keeps running). The tray "Quit" exits.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let _ = window.hide();
                 api.prevent_close();
             }
-        })
+        });
+
+    builder
         .invoke_handler(tauri::generate_handler![
             detect_ce,
             install_ce,
@@ -118,12 +140,14 @@ pub fn run() {
             app_list_raw,
             app_ps_raw,
             app_install,
+            platform,
         ])
         .run(tauri::generate_context!())
         .expect("error while running CE Desktop");
 }
 
-/// System tray: show window, pause/resume hosting, quit.
+/// System tray: show window, pause/resume hosting, quit. Desktop-only.
+#[cfg(desktop)]
 fn build_tray(app: tauri::AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(&app, "show", "Show CE Desktop", true, None::<&str>)?;
     let pause = MenuItem::with_id(&app, "pause", "Pause hosting (drain)", true, None::<&str>)?;
@@ -187,7 +211,8 @@ fn build_tray(app: tauri::AppHandle) -> tauri::Result<()> {
 }
 
 /// A minimal embedded fallback icon so the tray always has something to show even when
-/// the bundled window icon is unavailable (e.g. dev builds without an icon set).
+/// the bundled window icon is unavailable (e.g. dev builds without an icon set). Desktop-only.
+#[cfg(desktop)]
 fn default_icon() -> tauri::image::Image<'static> {
     // 1x1 transparent RGBA pixel; replaced by the real bundle icon in packaged builds.
     tauri::image::Image::new_owned(vec![0, 0, 0, 0], 1, 1)

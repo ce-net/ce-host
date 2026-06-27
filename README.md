@@ -38,7 +38,7 @@ shell, so the panels never change:
 | Desktop (Tauri) | `tauri` | supervised local `ce`, base URL + on-disk api.token over IPC | auto |
 | Browser PWA (in-page node) | `bridge` | `window.__ceNode` in-process via the SDK `bridgeFetch` — no network | none |
 | Browser, same-origin | `proxy` | reverse proxy `/ce` → `127.0.0.1:8844` | optional |
-| Browser, BYO | `byo` | an explicit node URL | pasted |
+| Browser / mobile, BYO | `byo` | an explicit / paired node URL | pasted / paired |
 
 ### PWA (installable + offline shell)
 
@@ -50,6 +50,34 @@ SW is registered from `main.ts` only in the PWA (skipped in the Tauri shell and 
 vite dev server); a captured `beforeinstallprompt` surfaces an explicit **Install app**
 button in the rail. Serve the built `dist/` via `ce-serve` (which can also inject the
 `/mesh-bridge` so the page becomes a node); a live browser smoke test must gate any deploy.
+
+### Mobile (companion)
+
+The same bundle runs as a native iOS/Android app via Tauri 2 mobile. A phone cannot install
+or spawn `ce` (sandbox), so the mobile shell is a **companion**: it does not supervise a
+node — it talks to one you already run (laptop / desktop / relay) over the network. The Rust
+`platform` command tells `host.ts` it is mobile, which skips the supervised path; you connect
+by pasting a **pairing link** (`ce-pair:…`, encoding base URL + capability token — the
+ce-fleet token model) or a node URL into the connect banner. The layout collapses to a
+bottom tab bar on narrow viewports (this also improves the PWA on phones today).
+
+The Rust shell is mobile-safe: the system tray and close-to-tray are `#[cfg(desktop)]`, and
+the `tray-icon` feature is a `cfg(desktop)` dependency, so a mobile build compiles cleanly.
+
+**Building the native mobile apps is a spike that needs a mobile toolchain** (not done in CI
+here): install the iOS (Xcode) / Android (SDK + NDK) toolchains and the Tauri CLI, then:
+
+```bash
+cd src-tauri
+cargo tauri ios init      # scaffolds gen/apple (needs Xcode)
+cargo tauri ios dev       # run on a simulator/device
+cargo tauri android init  # scaffolds gen/android (needs Android SDK + NDK)
+cargo tauri android dev
+# release bundles: cargo tauri ios build / cargo tauri android build
+```
+
+The generated `gen/apple` + `gen/android` projects are platform-specific and not committed
+here; run the `init` once in a mobile dev environment.
 
 ## Run (pure web)
 

@@ -1109,3 +1109,92 @@ a.link:hover {
   vertical-align: middle;
   opacity: 0.9;
 }
+
+/* ---------- responsive: phones / narrow viewports (PWA + mobile companion) ---------- */
+
+@media (max-width: 720px) {
+  /* Stack: content scrolls above a fixed bottom tab bar (the rail). */
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .main {
+    order: 1;
+    min-height: 0;
+  }
+  .rail {
+    order: 2;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-top: 1px solid var(--line);
+    padding: 6px 8px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+  /* Desktop-only chrome has no place in a bottom tab bar. */
+  .rail .brand,
+  .rail .rail-foot,
+  .rail .install-btn,
+  .rail .spacer {
+    display: none;
+  }
+  /* Nav items become icon-over-label tabs. */
+  .rail .nav-item {
+    flex: 1 0 auto;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 12px;
+    font-size: 10px;
+    white-space: nowrap;
+    border: none;
+    text-align: center;
+  }
+  .rail .nav-item .ico {
+    font-size: 16px;
+    width: auto;
+  }
+  .rail .nav-item .badge {
+    margin-left: 4px;
+    min-width: 16px;
+    padding: 0 5px;
+  }
+
+  /* Tighter content; header stats + dual-column grids reflow to fit. */
+  .view {
+    padding: 12px 12px 24px;
+  }
+  .header {
+    padding: 12px 14px;
+  }
+  .header-top {
+    flex-wrap: wrap;
+  }
+  .header-top .chain {
+    margin-left: 0;
+    width: 100%;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .subbar {
+    gap: 14px;
+  }
+  .explorer-grid {
+    grid-template-columns: 1fr;
+  }
+  .apps-grid {
+    grid-template-columns: 1fr;
+  }
+  .cap-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+  .token-banner {
+    flex-wrap: wrap;
+  }
+}

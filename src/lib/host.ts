@@ -22,7 +22,7 @@ import {
   BRIDGE_BASE_URL,
   SAME_ORIGIN_NODE_PATH,
 } from "@ce-net/sdk";
-import { isTauri, nodeStatus, readToken } from "./tauri.js";
+import { isTauri, nodeStatus, readToken, shellPlatform } from "./tauri.js";
 import { loadConfig } from "./config.js";
 
 export type HostKind = "tauri" | "bridge" | "proxy" | "byo";
@@ -41,8 +41,10 @@ export interface HostBinding {
 
 /** Resolve the active node transport for this shell. Never throws — degrades to BYO. */
 export async function resolveHost(): Promise<HostBinding> {
-  // 1. Native desktop: adopt the supervised node + on-disk token.
-  if (isTauri()) {
+  // 1. Native DESKTOP only: adopt the supervised node + on-disk token. Mobile shells
+  //    (ios/android) cannot install or spawn `ce`, so they fall through to companion mode
+  //    (a paired/remote node), exactly like a browser.
+  if (isTauri() && (await shellPlatform()) === "desktop") {
     try {
       const snap = await nodeStatus();
       const token = snap.token ?? (await readToken());
