@@ -19,8 +19,8 @@
  */
 
 import { Amount } from "@ce-net/sdk";
-import type { Channel } from "@ce-net/sdk";
-import { walletPanel, fmtCredits, shortId } from "@ce-net/ui";
+import type { Channel, TxRecord } from "@ce-net/sdk";
+import { walletPanel, fmtCredits, shortId, lineChart } from "@ce-net/ui";
 import type { Store } from "../stores/store.js";
 import { el, mount } from "../lib/dom.js";
 import { toast } from "../lib/toast.js";
@@ -41,7 +41,13 @@ export function renderWallet(store: Store, root: HTMLElement): void {
     onLoadOlder: (beforeHeight: number) => void store.loadOlderTx(beforeHeight),
   });
 
-  const blocks: (HTMLElement | null)[] = [panel];
+  const blocks: (HTMLElement | null)[] = [];
+
+  // Cumulative earned vs spent, derived from the itemized history (newest-first → chronological).
+  const chart = earningsCard(s.historyAvailable ? s.txHistory : []);
+  if (chart) blocks.push(chart);
+
+  blocks.push(panel);
 
   // Honest note when the node build predates the itemized-history endpoint.
   if (!s.historyAvailable) {
@@ -52,6 +58,71 @@ export function renderWallet(store: Store, root: HTMLElement): void {
   blocks.push(channelsCard(s.channels));
 
   mount(root, el("div", { class: "view wallet-view" }, ...blocks.filter((b): b is HTMLElement => !!b)));
+}
+
+/**
+ * "Earned vs spent over time" card: two cumulative series built from the transaction
+ * history. Money stays bigint base units into the chart (lineChart normalises with bigint,
+ * so a long run of large totals keeps full precision); the y-axis max label is a precise
+ * Amount string. Returns null until there are at least two points to draw a trend.
+ */
+function earningsCard(history: readonly TxRecord[]): HTMLElement | null {
+  if (history.length < 2) return null;
+
+  // History is newest-first; walk oldest→newest to accumulate.
+  const chrono = [...history].reverse();
+  let earned = 0n;
+  let spent = 0n;
+  const earnedSeries: bigint[] = [];
+  const spentSeries: bigint[] = [];
+  for (const t of chrono) {
+    if (t.direction === "in") earned += t.amount.base;
+    else spent += t.amount.base;
+    earnedSeries.push(earned);
+    spentSeries.push(spent);
+  }
+
+  const peak = earned > spent ? earned : spent;
+  const chart = lineChart(
+    [
+      { values: earnedSeries, stroke: "var(--teal)", fill: true, label: "earned" },
+      { values: spentSeries, stroke: "var(--violet)", label: "spent" },
+    ],
+    {
+      width: 560,
+      height: 150,
+      axis: true,
+      baselineZero: true,
+      label: "cumulative earned vs spent",
+      yLabels: { min: "0", max: `${fmtCredits(Amount.fromBaseUnits(peak), 0)} cr` },
+    },
+  );
+
+  return el(
+    "div",
+    { class: "ce-card", style: "margin-bottom:14px" },
+    el(
+      "div",
+      { class: "ce-card-head" },
+      el("h2", {}, "Earned vs spent"),
+      el(
+        "div",
+        { class: "chart-legend", style: "margin-left:auto" },
+        legendDot("var(--teal)", "earned"),
+        legendDot("var(--violet)", "spent"),
+      ),
+    ),
+    el("div", { class: "chart-body" }, chart),
+  );
+}
+
+function legendDot(color: string, label: string): HTMLElement {
+  return el(
+    "span",
+    { class: "leg" },
+    el("span", { class: "swatch", style: `background:${color}` }),
+    label,
+  );
 }
 
 function historyUnavailableNote(): HTMLElement {

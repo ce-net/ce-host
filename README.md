@@ -7,16 +7,19 @@ CE Desktop is a **pure SDK client** — zero new node primitives. It talks to a 
 node's existing HTTP+SSE API via [`@ce-net/sdk`](../ce-ts) and renders these views:
 
 - **Overview header** — earnings, share ratio badge, bond/weight, uptime, jobs running,
-  up-compute, live credits/min (`/status` + `/history/:self` + `/transactions/stream`).
+  up-compute, live credits/min with a trend sparkline (`/status` + `/history/:self` +
+  `/transactions/stream`).
 - **Jobs** — a live, torrent-style table with per-row image, payer, cpu/mem, elapsed,
   status, credits/min and a **kill** button (`/jobs`, `DELETE /jobs/:id`).
 - **Network** — a radial topology map of the mesh as seen from this node (self centred,
-  peers sized by cores, coloured by role) plus the dense atlas table (`/atlas`).
-- **Explorer** — live blocks + a transaction feed of every kind + a capacity leaderboard,
-  all from the SSE streams the store already consumes.
+  peers sized by cores, coloured by role), via the shared `@ce-net/ui` `netGraph`, plus the
+  dense atlas table (`/atlas`).
+- **Explorer** — a transactions-per-block activity chart, live blocks, a transaction feed
+  of every kind, and a capacity leaderboard, all from the SSE streams the store consumes.
 - **Apps** — the ce-appmgr store: install a curated set of ceapps in one click and read
   what is installed (`ce app list`) and running (`ce app ps`), driven via the supervisor.
-- **Wallet** — balance breakdown, transfers, and credit transaction history.
+- **Wallet** — balance breakdown, a cumulative earned-vs-spent chart, transfers, and
+  credit transaction history.
 - **Resource caps + scheduler** — CPU/mem offered, max jobs, advisory throttle, and a
   window/battery/CPU scheduler.
 - **Capabilities** — a local issued-grant log with copy/revoke, plus the on-chain

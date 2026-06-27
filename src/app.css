@@ -913,23 +913,16 @@ a.link:hover {
 .topo-wrap {
   padding: 8px 10px 14px;
 }
-svg.topo {
+.topo-wrap svg {
   width: 100%;
   height: auto;
   display: block;
 }
-svg.topo .node {
-  cursor: default;
-}
-svg.topo .node circle {
+.topo-wrap svg g circle {
   transition: fill-opacity 0.12s;
 }
-svg.topo .node:hover circle {
+.topo-wrap svg g:hover circle {
   fill-opacity: 1;
-}
-.topo-label {
-  font-family: var(--mono);
-  font-size: 10px;
 }
 .topo-legend {
   display: flex;
@@ -937,17 +930,6 @@ svg.topo .node:hover circle {
   font-size: 11px;
   color: var(--muted);
   font-family: var(--mono);
-}
-.topo-legend .leg {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.topo-legend .swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
 }
 
 /* ---------- explorer: feeds + leaderboard ---------- */
@@ -1080,4 +1062,45 @@ svg.topo .node:hover circle {
   word-break: break-word;
   max-height: 320px;
   overflow-y: auto;
+}
+
+/* ---------- charts (line / area from @ce-net/ui) ---------- */
+
+.chart-body {
+  padding: 12px 16px 14px;
+}
+.chart-body svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.chart-legend .leg,
+.topo-legend .leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chart-legend .swatch,
+.topo-legend .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+/* header live earnings sparkline */
+.crmin-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.crmin-cell svg {
+  vertical-align: middle;
+  opacity: 0.9;
 }

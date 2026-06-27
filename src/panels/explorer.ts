@@ -12,6 +12,7 @@
 
 import { type BlockEvent, type TxEvent, type TxKind } from "@ce-net/sdk";
 import type { AtlasEntry } from "@ce-net/sdk";
+import { lineChart } from "@ce-net/ui";
 import type { Store } from "../stores/store.js";
 import { el, mount } from "../lib/dom.js";
 import { fmtAgo, fmtCredits, fmtMem, shortId } from "../lib/format.js";
@@ -19,6 +20,7 @@ import { fmtAgo, fmtCredits, fmtMem, shortId } from "../lib/format.js";
 export function renderExplorer(store: Store, root: HTMLElement): void {
   mount(
     root,
+    activityCard(store),
     el(
       "div",
       { class: "explorer-grid" },
@@ -26,6 +28,41 @@ export function renderExplorer(store: Store, root: HTMLElement): void {
       txCard(store),
     ),
     leaderboardCard(store),
+  );
+}
+
+// ---- activity chart (transactions per recent block) ----
+
+function activityCard(store: Store): HTMLElement {
+  const blocks = store.state.recentBlocks;
+  let body: HTMLElement;
+  if (blocks.length < 2) {
+    body = el("div", { class: "card-body" }, el("div", { class: "empty" }, el("div", {}, "Gathering block activity…")));
+  } else {
+    // recentBlocks is newest-first; chart oldest→newest.
+    const series = [...blocks].reverse().map((b) => b.txCount);
+    body = el(
+      "div",
+      { class: "chart-body" },
+      lineChart([{ values: series, stroke: "var(--teal)", fill: true, label: "transactions per block" }], {
+        width: 1100,
+        height: 120,
+        axis: true,
+        baselineZero: true,
+        label: "transactions per recent block",
+      }),
+    );
+  }
+  return el(
+    "div",
+    { class: "card" },
+    el(
+      "div",
+      { class: "card-head" },
+      el("h2", {}, "Activity"),
+      el("div", { class: "right muted-note" }, "transactions per block"),
+    ),
+    body,
   );
 }
 

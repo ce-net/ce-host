@@ -53,6 +53,8 @@ export interface StoreState {
   accrualByOrigin: Map<string, bigint>;
   /** Self credits/min estimate (base units). */
   selfCreditsPerMin: bigint;
+  /** Newest-last ring of the self credits/min estimate (base units), for a live sparkline. */
+  selfCreditsPerMinHistory: bigint[];
   /** "removing" jobs (kill issued, awaiting next poll). */
   removing: Set<string>;
   /** Credit balance breakdown (total / free / locked-channels / locked-bond / bond). */
@@ -98,6 +100,7 @@ export class Store {
       firstSeen: { ...cfg.firstSeen },
       accrualByOrigin: new Map(),
       selfCreditsPerMin: 0n,
+      selfCreditsPerMinHistory: [],
       removing: new Set(),
       balance: null,
       txHistory: [],
@@ -112,6 +115,7 @@ export class Store {
   /** Cap for the Explorer's live rings — bounded so memory stays flat over long sessions. */
   private static readonly BLOCK_RING = 40;
   private static readonly TX_RING = 60;
+  private static readonly RATE_RING = 48;
 
   /** Rebuild the client (e.g. after the user sets a base URL / token in web mode). */
   reconfigure(baseUrl: string, token?: string): void {
@@ -360,7 +364,13 @@ export class Store {
       byOrigin.set(origin, sum);
     }
     const selfPerMin = byOrigin.get(this.selfId) ?? 0n;
-    this.set({ accrualByOrigin: byOrigin, selfCreditsPerMin: selfPerMin });
+    // Append to the live sparkline ring (recompute runs every 5s; ~4 min of history).
+    const history = [...this.state.selfCreditsPerMinHistory, selfPerMin].slice(-Store.RATE_RING);
+    this.set({
+      accrualByOrigin: byOrigin,
+      selfCreditsPerMin: selfPerMin,
+      selfCreditsPerMinHistory: history,
+    });
   }
 
   // ---- derived helpers ----

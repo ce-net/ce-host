@@ -5,6 +5,7 @@
  */
 
 import { Amount } from "@ce-net/sdk";
+import { sparkline } from "@ce-net/ui";
 import type { Store } from "../stores/store.js";
 import { el, mount } from "../lib/dom.js";
 import { fmtCredits, fmtUptime, ratio, shortId, fmtMem } from "../lib/format.js";
@@ -40,6 +41,12 @@ export function renderHeader(store: Store, root: HTMLElement): void {
 
   const uptimeSecs = cfg.hostStartedAt ? (Date.now() - cfg.hostStartedAt) / 1000 : 0;
   const crMin = store.selfCreditsPerMinAmount();
+  const rateHistory = s.selfCreditsPerMinHistory;
+  // A live earnings-rate sparkline (base-unit bigints → precise), shown once we have a trend.
+  const rateSpark =
+    rateHistory.length >= 2
+      ? sparkline(rateHistory, { width: 64, height: 16, stroke: "var(--teal)", dot: false })
+      : null;
 
   const header = el(
     "div",
@@ -77,7 +84,13 @@ export function renderHeader(store: Store, root: HTMLElement): void {
       el("span", {}, "UPTIME ", el("b", {}, fmtUptime(uptimeSecs))),
       el("span", {}, "JOBS RUNNING ", el("b", {}, String(runningJobs))),
       el("span", {}, "UP ▲ ", el("b", {}, `${upCores} cores / ${fmtMem(upMem)}`)),
-      el("span", {}, "credits/min ", el("b", {}, `~${fmtCredits(crMin, 2)}`)),
+      el(
+        "span",
+        { class: "crmin-cell" },
+        "credits/min ",
+        el("b", {}, `~${fmtCredits(crMin, 2)}`),
+        rateSpark,
+      ),
     ),
   );
 

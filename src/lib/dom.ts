@@ -30,35 +30,6 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-/**
- * Create an SVG element in the correct namespace. `document.createElement` produces
- * HTML elements that never render inside an <svg>, so topology/charts must use this.
- * Attributes are set verbatim (SVG uses kebab-case attrs like `stroke-width`); event
- * handlers (`onClick`) are wired the same way as {@link el}.
- */
-export function svgEl<K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string | number | EventListener | undefined> = {},
-  ...children: (Node | string | null | undefined)[]
-): SVGElementTagNameMap[K] {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v === undefined) continue;
-    if (k.startsWith("on") && typeof v === "function") {
-      node.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
-    } else {
-      node.setAttribute(k, String(v));
-    }
-  }
-  for (const c of children) {
-    if (c === null || c === undefined) continue;
-    node.append(typeof c === "string" ? document.createTextNode(c) : c);
-  }
-  return node;
-}
-
 /** Replace all children of `parent` with `nodes`. */
 export function mount(parent: HTMLElement, ...nodes: (Node | null | undefined)[]): void {
   parent.replaceChildren(...nodes.filter((n): n is Node => !!n));
