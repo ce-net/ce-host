@@ -3,6 +3,10 @@
 The flagship native UI for ce-net (repo: `ce-host`). One machine's node, made legible:
 join the mesh in one click, watch the network live, run apps, and see what you earn.
 
+**Live (PWA):** https://desktop.ce-net.com — served by `ce-serve` from a content-addressed
+bundle, registered in `ce-hub` as `ce-desktop`. Deploy with `bash deploy/deploy.sh` (build →
+publish to the relay via `ce-publish` → live browser smoke gate); see [Deploy](#deploy).
+
 CE Desktop is a **pure SDK client** — zero new node primitives. It talks to a local CE
 node's existing HTTP+SSE API via [`@ce-net/sdk`](../ce-ts) and renders these views:
 
@@ -78,6 +82,29 @@ cargo tauri android dev
 
 The generated `gen/apple` + `gen/android` projects are platform-specific and not committed
 here; run the `init` once in a mobile dev environment.
+
+## Deploy
+
+The PWA is published as a content-addressed bundle and served at `desktop.ce-net.com`:
+
+```bash
+bash deploy/deploy.sh         # build dist/ -> rsync to relay -> ce-publish -> smoke gate
+bash deploy/deploy.sh smoke   # re-run the live browser smoke test only
+```
+
+`deploy/deploy.sh` builds `dist/`, rsyncs it to the relay, and runs `ce-publish bundle dist
+desktop.ce-net.com ce-desktop` **on the relay** (so ce-serve fetches the blobs from its own
+local node). `ce-publish` blob-uploads every file, writes a `{v,spa,files}` manifest, and
+registers `desktop.ce-net.com -> bundle` in ce-hub; ce-serve resolves the host on the next
+request (the nginx `*.ce-net.com` regex + the Cloudflare wildcard already route it, so no
+nginx/DNS change is needed). `deploy/smoke.sh` is the post-deploy gate: it asserts, against
+the LIVE URL, that the page serves HTML, ce-serve injected the mesh bridge, every hashed
+asset + the PWA artifacts return 200, and (when Chrome is present) that the app actually
+boots and renders its nav. Needs the relay key (`ssh-add ~/.ssh/id_ed25519`).
+
+Publishing the **native** desktop/mobile binaries as `ce app install ce-desktop` artifacts
+(the `ceapp.toml` placeholders) still needs the Tauri bundle build — see the mobile spike
+above; that is separate from this web-bundle deploy.
 
 ## Run (pure web)
 
